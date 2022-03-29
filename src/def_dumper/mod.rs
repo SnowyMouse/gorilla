@@ -254,6 +254,7 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
                 0xFFFFFFFF => None,
                 n => Some(group_fourccs.get(&n)?.to_owned())
             },
+            fourcc: LittleEndian::read_u32(&group_struct[8..]),
             block: recursively_parse_block(block_struct, file_data, &m, &group_fourccs, use_old_offsets)?
         });
     }

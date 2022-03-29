@@ -116,6 +116,7 @@ pub struct Block {
 pub struct Group {
     pub name: String,
     pub supergroup: Option<String>,
+    pub fourcc: u32,
     pub block: Block
 }
 
