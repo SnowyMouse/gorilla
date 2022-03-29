@@ -7,8 +7,9 @@ use self::serde::Serialize;
 #[derive(Default)]
 pub struct FieldName {
     pub name : String,
-    pub hidden: bool,
-    pub read_only: bool,
+    pub hidden : bool,
+    pub read_only : bool,
+    pub main : bool,
     pub description : Option<String>,
     pub unit : Option<String>
 }
@@ -42,15 +43,15 @@ impl FieldName {
             None => ()
         }
 
-        // This also seems to hide it too
+        // Read only
         if name_copy.contains("*") {
-            f.hidden = true;
+            f.read_only = true;
             name_copy = name_copy.replace("*", "");
         }
 
-        // Is it read only?
+        // Is it the main thing?
         if name_copy.contains("^") {
-            f.read_only = true;
+            f.main = true;
             name_copy = name_copy.replace("^", "");
         }
 
@@ -73,6 +74,10 @@ impl FieldName {
 
         if self.hidden {
             map.serialize_entry("hidden", &true)?
+        }
+
+        if self.main {
+            map.serialize_entry("main", &true)?
         }
 
         match self.unit {
