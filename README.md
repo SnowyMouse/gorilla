@@ -4,4 +4,4 @@ This is a definition dumper for the HEK. It dumps definitions into JSON which ca
 
 The usage is as follows:
 
-    `gorilla <path-to-guerilla.exe> <output-file.json>`
+    gorilla <path-to-guerilla.exe> <output-file.json>
