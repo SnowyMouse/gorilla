@@ -9,7 +9,8 @@ pub struct FieldName {
     pub read_only : bool,
     pub main : bool,
     pub description : Option<String>,
-    pub unit : Option<String>
+    pub unit : Option<String>,
+    pub color : Option<String>
 }
 impl FieldName {
     pub fn new(name: &str) -> Self {
@@ -62,6 +63,16 @@ impl FieldName {
             None => ()
         }
 
+        // Color?
+        f.hidden = f.hidden || hide_maybe(&mut name_copy);
+        match name_copy.find("|") {
+            Some(n) => {
+                f.color = Some(name_copy[n+1..].to_owned());
+                name_copy = name_copy[..n].to_owned();
+            },
+            None => ()
+        }
+
         // Done
         f.hidden = f.hidden || hide_maybe(&mut name_copy);
         f.name = name_copy;
@@ -75,7 +86,7 @@ impl FieldName {
         match self.description {
             Some(ref n) => map.serialize_entry("description", n)?,
             None => ()
-        };
+        }
 
         if self.read_only {
             map.serialize_entry("read_only", &true)?
@@ -93,6 +104,11 @@ impl FieldName {
             Some(ref n) => map.serialize_entry("unit", n)?,
             None => ()
         };
+
+        match self.color {
+            Some(ref n) => map.serialize_entry("color", n)?,
+            None => ()
+        }
 
         Ok(())
     }
