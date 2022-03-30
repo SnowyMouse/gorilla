@@ -1,11 +1,15 @@
 [package]
 name = "gorilla"
-version = "0.1.0"
+version = "0.1.1"
 description = "Definition dumper for Halo: Combat Evolved's guerilla.exe"
 license = "GPL-3.0-only"
+build = "build.rs"
 
 [dependencies]
 clap = { version = "3.1.6", features = ["derive"] }
 byteorder = "1"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+
+[build-dependencies]
+embed-resource = "1.7"
