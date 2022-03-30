@@ -2,14 +2,22 @@
 
 use super::byteorder::{ByteOrder, LittleEndian, BigEndian};
 
+#[derive(Debug)]
 pub struct PESectionPtr {
     pub offset : usize,
     pub size : usize,
     pub address : u32
 }
 
+#[derive(Debug)]
+pub struct PEData {
+    pub creation_date : u32,
+    pub checksum : u32,
+    pub sections : Vec<PESectionPtr>
+}
+
 /// Read the PE header and get the data sections from a Win32 EXE
-pub fn get_win32_exe_sections(file_data: &[u8]) -> Option<Vec<PESectionPtr>> {
+pub fn get_win32_exe_sections(file_data: &[u8]) -> Option<PEData> {
     // Get the PE header
     let pe_header = &file_data[LittleEndian::read_u32(&file_data[0x3C..]) as usize..];
     if BigEndian::read_u32(pe_header) != 0x50450000 { // check PE magic
@@ -30,9 +38,11 @@ pub fn get_win32_exe_sections(file_data: &[u8]) -> Option<Vec<PESectionPtr>> {
         }
         return None
     }
+    let creation_date = LittleEndian::read_u32(&koffing[4..]);
     let section_count = LittleEndian::read_u16(&koffing[2..]) as usize;
     let opt_header_size = LittleEndian::read_u16(&koffing[16..]);
     let opt_header = &koffing[20..];
+    let checksum = LittleEndian::read_u32(&opt_header[64..]);
     let pe_type = LittleEndian::read_u16(&opt_header);
     let win_specific_fields_opt = &opt_header[24..];
     let image_base;
@@ -61,5 +71,9 @@ pub fn get_win32_exe_sections(file_data: &[u8]) -> Option<Vec<PESectionPtr>> {
         sections.push(PESectionPtr { offset: pointer_to_raw_data, size: size_of_raw_data, address: virtual_address });
     }
 
-    Some(sections)
+    Some(PEData {
+        creation_date: creation_date,
+        checksum: checksum,
+        sections: sections
+    })
 }

@@ -1,5 +1,8 @@
 //! Definition dumper
 
+extern crate serde;
+extern crate serde_json;
+
 use std::ffi::CString;
 use std::collections::BTreeMap;
 
@@ -12,6 +15,9 @@ use self::signature_scan::*;
 
 mod win32;
 use self::win32::*;
+
+extern crate chrono;
+use self::chrono::prelude::{DateTime, Utc, NaiveDateTime};
 
 extern crate byteorder;
 use self::byteorder::{ByteOrder, LittleEndian};
@@ -30,15 +36,24 @@ fn read_string(data : &[u8]) -> Option<String> {
     Some(CString::from_vec_with_nul(data[..data.iter().position(|&b| b == 0)?+1].to_vec()).unwrap().to_str().unwrap().to_owned())
 }
 
+#[derive(serde::Serialize)]
+struct Group {
+    supergroup: Option<String>,
+    fourcc: u32,
+    block: Block
+}
+
 /// Dump all definitions into a JSON
 pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
-    let m = get_win32_exe_sections(file_data)?;
+    let pe_data = get_win32_exe_sections(file_data)?;
+
+    let pe_sections = &pe_data.sections;
 
     // Find the group thing
     let (group_count, group_array, use_old_offsets) = match signature_scan(file_data, &sig!(0x39, 0x0C, 0x85, -1, -1, -1, -1, 0x74, 0x14, 0x46, 0x66, 0x83, 0xFE, -1, 0x72, 0xED)) {
-        Some(n) => Some((file_data[n + 13] as usize, &file_data[translate_ptr(&m, LittleEndian::read_u32(&file_data[n + 3..]))?..], false)),
+        Some(n) => Some((file_data[n + 13] as usize, &file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&file_data[n + 3..]))?..], false)),
         None => match signature_scan(file_data, &sig!(0x39, 0x14, 0xB5, -1, -1, -1, -1, 0x74, 0x09, 0x41, 0x66, 0x83, 0xF9, -1, 0x72, 0xED)) {
-            Some(n) => Some((file_data[n + 13] as usize, &file_data[translate_ptr(&m, LittleEndian::read_u32(&file_data[n + 3..]))?..], true)),
+            Some(n) => Some((file_data[n + 13] as usize, &file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&file_data[n + 3..]))?..], true)),
             None => None
         }
     }?;
@@ -50,8 +65,8 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
         group_names.reserve(group_count);
 
         for g in 0..group_count {
-            let group_struct = &file_data[translate_ptr(&m, LittleEndian::read_u32(&group_array[g*4..]))?..];
-            let group_name = read_string(&file_data[translate_ptr(&m, LittleEndian::read_u32(&group_struct[0..]))?..])?;
+            let group_struct = &file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&group_array[g*4..]))?..];
+            let group_name = read_string(&file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&group_struct[0..]))?..])?;
             let group_fourcc = LittleEndian::read_u32(&group_struct[8..]);
             fourcc_arr.insert(group_fourcc, group_name.clone());
             group_names.push(group_name);
@@ -60,11 +75,11 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
     };
 
     // Go through each group
-    let mut group_blocks = Vec::<Group>::new();
+    let mut group_blocks = BTreeMap::<String, Group>::new();
     for g in 0..group_count {
-        let group_struct = &file_data[translate_ptr(&m, LittleEndian::read_u32(&group_array[g*4..]))?..];
+        let group_struct = &file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&group_array[g*4..]))?..];
         let group_name = &group_names[g];
-        let block_struct = &file_data[translate_ptr(&m, LittleEndian::read_u32(&group_struct[0x18..]))?..];
+        let block_struct = &file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&group_struct[0x18..]))?..];
 
         fn recursively_parse_block(block_data: &[u8], file_data: &[u8], pe_sections: &[PESectionPtr], groups: &BTreeMap::<u32, String>, use_old_offsets: bool) -> Option<Block> {
             let mut b = Block::default();
@@ -248,18 +263,28 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
             Some(b)
         }
 
-        group_blocks.push(Group {
-            name: group_name.to_owned(),
+        group_blocks.insert(group_name.to_owned(), Group {
             supergroup: match LittleEndian::read_u32(&group_struct[0xC..]) {
                 0xFFFFFFFF => None,
                 n => Some(group_fourccs.get(&n)?.to_owned())
             },
             fourcc: LittleEndian::read_u32(&group_struct[8..]),
-            block: recursively_parse_block(block_struct, file_data, &m, &group_fourccs, use_old_offsets)?
+            block: recursively_parse_block(block_struct, file_data, pe_sections, &group_fourccs, use_old_offsets)?
         });
     }
 
-    match serde_json::to_vec_pretty(&group_blocks) {
+    #[derive(serde::Serialize)]
+    struct FinalJSONOutput {
+        exe_date: String,
+        exe_checksum: u32,
+        groups: BTreeMap<String, Group>
+    }
+
+    match serde_json::to_vec_pretty(&FinalJSONOutput {
+        exe_date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(pe_data.creation_date as i64, 0), Utc).date().format("%Y-%m-%d").to_string(),
+        exe_checksum: pe_data.checksum,
+        groups: group_blocks
+    }) {
         Ok(n) => Some(n),
         Err(_) => None
     }

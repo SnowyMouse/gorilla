@@ -1,8 +1,6 @@
 //! Halo-related data and block structs
 
-extern crate serde;
-extern crate serde_json;
-use self::serde::Serialize;
+use super::serde::Serialize;
 
 #[derive(Default)]
 pub struct FieldName {
@@ -112,14 +110,6 @@ pub struct Block {
     pub fields : Vec<Field>
 }
 
-#[derive(Serialize)]
-pub struct Group {
-    pub name: String,
-    pub supergroup: Option<String>,
-    pub fourcc: u32,
-    pub block: Block
-}
-
 pub enum BlockFieldType {
     Unknown(u32, u32),
     Index(String, String),
@@ -153,7 +143,7 @@ impl std::fmt::Display for BlockFieldType {
     }
 }
 
-use self::serde::ser::{Serializer, SerializeMap};
+use super::serde::ser::{Serializer, SerializeMap};
 
 impl Serialize for Field {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer, {
