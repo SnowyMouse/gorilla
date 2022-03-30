@@ -282,7 +282,7 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
     }
 
     match serde_json::to_vec_pretty(&FinalJSONOutput {
-        dumper_version: format!("{} {}", std::env::var("CARGO_PKG_NAME").unwrap_or("unknown".to_owned()), std::env::var("CARGO_PKG_VERSION").unwrap_or("unknown".to_owned())),
+        dumper_version: env!("gorilla_version").to_owned(),
         exe_creation_date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(pe_data.creation_date as i64, 0), Utc).format("%Y-%m-%dT%T").to_string(),
         exe_checksum: pe_data.checksum,
         groups: group_blocks
