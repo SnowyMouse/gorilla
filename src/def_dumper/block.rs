@@ -17,13 +17,20 @@ impl FieldName {
 
         let mut name_copy = name.to_owned();
 
-        // Hide?
-        if name_copy.ends_with("!") {
-            f.hidden = true;
-            name_copy = name_copy[..name_copy.len()-1].to_owned();
-        }
+        // Hide if ! at end
+        let hide_maybe = |name : &mut String| -> bool {
+            // Hide?
+            if name.ends_with("!") {
+                *name = name[..name.len()-1].to_owned();
+                true
+            }
+            else {
+                false
+            }
+        };
 
         // Comment?
+        f.hidden = f.hidden || hide_maybe(&mut name_copy);
         match name_copy.find("#") {
             Some(n) => {
                 f.description = Some(name_copy[n+1..].to_owned());
@@ -32,16 +39,8 @@ impl FieldName {
             None => ()
         }
 
-        // Units?
-        match name_copy.find(":") {
-            Some(n) => {
-                f.unit = Some(name_copy[n+1..].to_owned());
-                name_copy = name_copy[..n].to_owned();
-            },
-            None => ()
-        }
-
         // Read only
+        f.hidden = f.hidden || hide_maybe(&mut name_copy);
         if name_copy.contains("*") {
             f.read_only = true;
             name_copy = name_copy.replace("*", "");
@@ -53,8 +52,20 @@ impl FieldName {
             name_copy = name_copy.replace("^", "");
         }
 
+        // Units?
+        f.hidden = f.hidden || hide_maybe(&mut name_copy);
+        match name_copy.find(":") {
+            Some(n) => {
+                f.unit = Some(name_copy[n+1..].to_owned());
+                name_copy = name_copy[..n].to_owned();
+            },
+            None => ()
+        }
+
         // Done
+        f.hidden = f.hidden || hide_maybe(&mut name_copy);
         f.name = name_copy;
+
         f
     }
 
@@ -175,7 +186,7 @@ impl Serialize for Field {
             },
             BlockFieldType::Section(description) => {
                 map.serialize_entry("type", "section")?;
-                map.serialize_entry("description", description)?;
+                map.serialize_entry("text", description)?;
             },
             BlockFieldType::Reference(allowed_groups) => {
                 map.serialize_entry("type", "tag_reference")?;
