@@ -16,67 +16,57 @@ impl FieldName {
     pub fn new(name: &str) -> Self {
         let mut f = FieldName::default();
 
-        let mut name_copy = name.to_owned();
+        // If it contains a backtick anywhere, it's hidden (but the backtick stays?)
+        if name.contains('`') {
+            f.hidden = true;
+        }
 
-        // Hide if ! at end
-        let hide_maybe = |name : &mut String| -> bool {
-            // Hide?
-            if name.ends_with("!") {
-                *name = name[..name.len()-1].to_owned();
-                true
+        // Split things
+        // Note: This is probably not a good idea since Rust uses UTF-8, but it's probably safe for guerilla since it's ASCII
+        let control_characters = vec!['#', ':', '|', '^', '!', '*', '&', '~'];
+        let mut current_section = 0;
+        let all_chars : Vec<char> = name.chars().collect();
+        let all_chars_len = all_chars.len();
+        let mut parts = Vec::<String>::new();
+        for c in 0..all_chars_len {
+            if control_characters.contains(&all_chars[c]) {
+                parts.push(all_chars[current_section..c].iter().collect());
+                current_section = c;
             }
-            else {
-                false
+        }
+        parts.push(all_chars[current_section..].iter().collect());
+        let mut part_iterator = parts.drain(0..parts.len());
+
+        // Loop through everything
+        f.name = part_iterator.next().unwrap();
+        loop {
+            match part_iterator.next() {
+                Some(n) => {
+                    match n.chars().nth(0) {
+                        Some(c) => {
+                            if control_characters.contains(&c) {
+                                match c {
+                                    '#' => f.description = Some(n.get(1..).unwrap().to_owned()),
+                                    ':' => f.unit = Some(n.get(1..).unwrap().to_owned()),
+                                    '|' => f.color = Some(n.get(1..).unwrap().to_owned()),
+                                    '&' => f.name = n.get(1..).unwrap().to_owned(), // overrides the name
+                                    '^' => f.main = true,
+                                    '!' => f.hidden = true,
+                                    '*' => f.read_only = true,
+                                    '~' => (), // tilde - doesn't do anything
+                                    _ => unreachable!()
+
+                                }
+                            }
+                        },
+                        None => ()
+                    }
+                },
+                None => break
             }
-        };
-
-        // Comment?
-        f.hidden = f.hidden || hide_maybe(&mut name_copy);
-        match name_copy.find("#") {
-            Some(n) => {
-                f.description = Some(name_copy[n+1..].to_owned());
-                name_copy = name_copy[..n].to_owned();
-            },
-            None => ()
-        }
-
-        // Read only
-        f.hidden = f.hidden || hide_maybe(&mut name_copy);
-        if name_copy.contains("*") {
-            f.read_only = true;
-            name_copy = name_copy.replace("*", "");
-        }
-
-        // Is it the main thing?
-        if name_copy.contains("^") {
-            f.main = true;
-            name_copy = name_copy.replace("^", "");
-        }
-
-        // Units?
-        f.hidden = f.hidden || hide_maybe(&mut name_copy);
-        match name_copy.find(":") {
-            Some(n) => {
-                f.unit = Some(name_copy[n+1..].to_owned());
-                name_copy = name_copy[..n].to_owned();
-            },
-            None => ()
-        }
-
-        // Color?
-        f.hidden = f.hidden || hide_maybe(&mut name_copy);
-        match name_copy.find("|") {
-            Some(n) => {
-                f.color = Some(name_copy[n+1..].to_owned());
-                name_copy = name_copy[..n].to_owned();
-            },
-            None => ()
         }
 
         // Done
-        f.hidden = f.hidden || hide_maybe(&mut name_copy);
-        f.name = name_copy;
-
         f
     }
 
