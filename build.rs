@@ -52,4 +52,7 @@ IDI_ICON1 ICON DISCARDABLE \"icon/icon.ico\"
 
     // Store gorilla version
     println!("cargo:rustc-env=gorilla_version={} {}", gorilla_pkg, gorilla_version);
+
+    // We only need to change if Cargo.toml was modified, since that's where the version is stored
+    println!("cargo:rerun-if-changed=Cargo.toml");
 }
