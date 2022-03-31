@@ -1,6 +1,6 @@
 [package]
 name = "gorilla"
-version = "0.2.1"
+version = "0.3.0"
 description = "Definition dumper for Halo: Combat Evolved's guerilla.exe"
 license = "GPL-3.0-only"
 build = "build.rs"
