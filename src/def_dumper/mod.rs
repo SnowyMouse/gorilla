@@ -22,10 +22,10 @@ use self::chrono::prelude::{DateTime, Utc, NaiveDateTime};
 extern crate byteorder;
 use self::byteorder::{ByteOrder, LittleEndian};
 
-fn translate_ptr(pointers: &[PESectionPtr], ptr: u32) -> Option<usize> {
-    for ref i in pointers {
-        if i.address <= ptr && (i.address + i.size as u32) > ptr {
-            return Some(ptr as usize - i.address as usize + i.offset)
+fn translate_ptr(pointers: &BTreeMap<String, PESectionPtr>, ptr: u32) -> Option<usize> {
+    for (_,v) in pointers {
+        if v.address <= ptr && (v.address + v.size as u32) > ptr {
+            return Some(ptr as usize - v.address as usize + v.offset)
         }
     }
     None
@@ -81,7 +81,7 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
         let group_name = &group_names[g];
         let block_struct = &file_data[translate_ptr(pe_sections, LittleEndian::read_u32(&group_struct[0x18..]))?..];
 
-        fn recursively_parse_block(block_data: &[u8], file_data: &[u8], pe_sections: &[PESectionPtr], groups: &BTreeMap::<u32, String>, use_old_offsets: bool) -> Option<Block> {
+        fn recursively_parse_block(block_data: &[u8], file_data: &[u8], pe_sections: &BTreeMap<String, PESectionPtr>, groups: &BTreeMap::<u32, String>, use_old_offsets: bool) -> Option<Block> {
             let mut b = Block::default();
 
             // Read the name?
@@ -276,6 +276,7 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
     #[derive(serde::Serialize)]
     struct FinalJSONOutput {
         dumper_version: String,
+        exe_version: Option<String>,
         exe_creation_date: String,
         exe_checksum: u32,
         groups: BTreeMap<String, Group>
@@ -283,6 +284,7 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
 
     match serde_json::to_vec_pretty(&FinalJSONOutput {
         dumper_version: env!("gorilla_version").to_owned(),
+        exe_version: pe_data.version,
         exe_creation_date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(pe_data.creation_date as i64, 0), Utc).format("%Y-%m-%dT%T").to_string(),
         exe_checksum: pe_data.checksum,
         groups: group_blocks
