@@ -6,6 +6,9 @@ extern crate serde_json;
 use std::ffi::CString;
 use std::collections::BTreeMap;
 
+extern crate sha2;
+use self::sha2::{Sha256, Digest};
+
 mod block;
 use self::block::*;
 
@@ -276,17 +279,31 @@ pub fn dump_definitions_into_json(file_data: &[u8]) -> Option<Vec<u8>> {
     #[derive(serde::Serialize)]
     struct FinalJSONOutput {
         dumper_version: String,
-        exe_version: Option<String>,
-        exe_creation_date: String,
-        exe_checksum: u32,
+        exe_sha256sum: String,
+        exe_pe_file_version: Option<String>,
+        exe_pe_creation_date: String,
+        exe_pe_checksum: u32,
         groups: BTreeMap<String, Group>
     }
 
+    // Make the JSON output
     match serde_json::to_vec_pretty(&FinalJSONOutput {
         dumper_version: env!("gorilla_version").to_owned(),
-        exe_version: pe_data.version,
-        exe_creation_date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(pe_data.creation_date as i64, 0), Utc).format("%Y-%m-%dT%T").to_string(),
-        exe_checksum: pe_data.checksum,
+        exe_sha256sum: {
+            let mut sha256 = Sha256::new();
+            sha256.update(file_data);
+
+            let result = sha256.finalize();
+            let mut result_string = String::new();
+            for i in result {
+                result_string += &format!("{:02X}", i);
+            }
+
+            result_string
+        },
+        exe_pe_file_version: pe_data.version,
+        exe_pe_creation_date: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(pe_data.creation_date as i64, 0), Utc).format("%Y-%m-%dT%T").to_string(),
+        exe_pe_checksum: pe_data.checksum,
         groups: group_blocks
     }) {
         Ok(n) => Some(n),
