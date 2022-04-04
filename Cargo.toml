@@ -17,5 +17,6 @@ sha2 = "0.10.2"
 embed-resource = "1.7"
 
 [profile.release]
+panic = "abort"
 strip = true
 lto = true
